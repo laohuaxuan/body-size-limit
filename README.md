@@ -30,6 +30,7 @@
 
 ```bash
 tinygo build -o main.wasm -target=wasi -buildmode=c-shared -scheduler=none -no-debug .
+编译后：main.wasm
 ```
 
 ## 本地联调（Docker Compose）
