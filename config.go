@@ -1,46 +1,39 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm"
-	"github.com/tetratelabs/proxy-wasm-go-sdk/proxywasm/types"
+	"github.com/tidwall/gjson"
 )
 
 // Config 定义插件的配置结构体
 type Config struct {
-	MaxBodySizeStr string `json:"max_body_size" yaml:"max_body_size"`
+	MaxBodySizeStr string
+	MaxBodySize    uint64
 }
 
 const defaultMaxBodySizeStr = "10m"
 
-func parseConfigFromData(data []byte) (Config, error) {
-	cfg := Config{MaxBodySizeStr: defaultMaxBodySizeStr}
-	if len(data) > 0 {
-		if err := json.Unmarshal(data, &cfg); err != nil {
-			return Config{}, err
-		}
+func parseConfig(json gjson.Result, cfg *Config) error {
+	sizeStr := strings.TrimSpace(json.Get("max_body_size").String())
+	if sizeStr == "" {
+		sizeStr = defaultMaxBodySizeStr
 	}
 
-	cfg.MaxBodySizeStr = strings.TrimSpace(cfg.MaxBodySizeStr)
-	if cfg.MaxBodySizeStr == "" {
-		cfg.MaxBodySizeStr = defaultMaxBodySizeStr
-	}
-	return cfg, nil
-}
-
-func parseMaxBodySizeFromConfig(cfg Config) (uint64, error) {
-	maxBytes, err := parseSizeToBytes(cfg.MaxBodySizeStr)
+	maxBytes, err := parseSizeToBytes(sizeStr)
 	if err != nil {
-		return 0, err
+		return fmt.Errorf("invalid max_body_size %q: %w", sizeStr, err)
 	}
 	if maxBytes == 0 {
 		maxBytes = 10 * 1024 * 1024
 	}
-	return maxBytes, nil
+
+	cfg.MaxBodySizeStr = sizeStr
+	cfg.MaxBodySize = maxBytes
+	return nil
 }
 
 // parseSizeToBytes 将字符串转换为字节数
@@ -80,26 +73,3 @@ func parseSizeToBytes(sizeStr string) (uint64, error) {
 	}
 }
 
-// initConfig 初始化并解析插件配置
-func initConfig() (*Config, types.OnPluginStartStatus) {
-	data, err := proxywasm.GetPluginConfiguration()
-	if err != nil {
-		proxywasm.LogErrorf("failed to get plugin configuration: %v", err)
-		return nil, types.OnPluginStartStatusFailed
-	}
-
-	cfg, err := parseConfigFromData(data)
-	if err != nil {
-		proxywasm.LogErrorf("failed to parse plugin configuration: %v", err)
-		return nil, types.OnPluginStartStatusFailed
-	}
-
-	maxBytes, err := parseMaxBodySizeFromConfig(cfg)
-	if err != nil {
-		proxywasm.LogErrorf("failed to parse max body size value: %v", err)
-		return nil, types.OnPluginStartStatusFailed
-	}
-
-	proxywasm.LogInfof("startup max_body_size(default or global): %s (%d bytes)", cfg.MaxBodySizeStr, maxBytes)
-	return &cfg, types.OnPluginStartStatusOK
-}
