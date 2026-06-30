@@ -1,44 +1,80 @@
-# 编译与准备阶段
-## 编译
+# body-size-limit
+
+`body-size-limit` 是一个用于限制 HTTP 请求体大小的 Wasm 插件，支持：
+- 普通请求（`Content-Length`）
+- 分块传输请求（chunked）
+
+超出阈值后，插件会直接返回 `413 Request Entity Too Large`。
+
+## 配置说明
+
+插件配置为 JSON，示例：
+
+```json
+{
+  "max_body_size": "50m"
+}
+```
+
+`max_body_size` 支持以下单位（不区分大小写）：
+- `k`：KB（1024 B）
+- `m`：MB（1024 KB）
+- `g`：GB（1024 MB）
+- 无单位：按字节处理
+
+未配置或空值时，默认使用 `10m`。
+
+## 编译 Wasm
+
+使用 TinyGo 以 reactor 模式编译（MSE/Envoy 必需）：
+
+```bash
 tinygo build -o main.wasm -target=wasi -buildmode=c-shared -scheduler=none -no-debug .
-## 准备配置文件
-```
-{
-    "max_body_size": "50m"
-}
-```
-*可填写的单位：*
-- "k": 千字节（1024 B）
-- "m": 兆字节（1024 KB）
-- "g": 吉字节（1024 MB）
-- "": 空代表字节
-
- # 上传自定义插件
- ## 登录阿里云MSE微服务引擎控制台
- ## 进入网关实例
- ## 进入插件市场
- ### 在自定义插件页上传.wasm后缀插件
- ### 填写信息：
-*名称：如request-body-limiter*
-*描述：限制请求体大小，支持标准和分块传输*
-
-# 启用插件
-- 插件配置新建规则
-- 配置规则
-```
-{
-    "max_body_size": "50m"
-}
 ```
 
-# 验证
-- 发送一个Body大于50MB的请求，网关应立即返回 413 Request Entity Too Large 状态码
-- 分块传输：使用curl -T 发送分块传输的大文件，验证是否在接收过程及时阻断并返回413
+## 本地联调（Docker Compose）
 
-## 本地测试
-### 运行docker compose
+启动：
+
+```bash
 docker compose -f docker-compose.yaml up --force-recreate
-### 停滞docker compose
-docker compose -f docker-compose.yaml down -v 
-### 运行测试脚本
+```
+
+停止并清理：
+
+```bash
+docker compose -f docker-compose.yaml down -v
+```
+
+运行测试脚本：
+
+```bash
 bash test/test.sh
+```
+
+## 部署到阿里云 MSE 网关
+
+1. 登录 MSE 控制台，进入目标网关实例。
+2. 打开插件市场，在自定义插件中上传 `main.wasm`。
+3. 创建插件规则并填写配置，例如：
+
+```json
+{
+  "max_body_size": "1m"
+}
+```
+
+4. 发布规则并等待生效。
+
+## 验证建议
+
+- 小于阈值请求应返回 `200`。
+- 大于阈值请求应返回 `413`。
+- 分块传输大包也应返回 `413`。
+
+## 常见问题
+
+- 出现 `_start ... restricted_callback`：
+  通常是 Wasm 编译模式错误，请确认使用了 `-buildmode=c-shared`。
+- 规则配置了 `1m` 但看起来像默认值：
+  优先检查规则是否命中实际请求的域名/路由，以及规则是否已发布生效。
