@@ -61,9 +61,12 @@ bash test/test.sh
 
 ```json
 {
-  "max_body_size": "1m"
+  "max_body_size": "10m"
 }
 ```
+4. 部署后截图
+<img width="2340" height="373" alt="image" src="https://github.com/user-attachments/assets/127d2231-65b8-4889-857b-97c373e42094" />
+
 
 4. 发布规则并等待生效。
 
@@ -72,10 +75,11 @@ bash test/test.sh
 - 小于阈值请求应返回 `200`。
 - 大于阈值请求应返回 `413`。
 - 分块传输大包也应返回 `413`。
+- 拦截截图
+  <img width="1477" height="581" alt="image" src="https://github.com/user-attachments/assets/1623647c-8a55-4bcb-91d7-9e1796b548fc" />
+
 
 ## 常见问题
 
 - 出现 `_start ... restricted_callback`：
   通常是 Wasm 编译模式错误，请确认使用了 `-buildmode=c-shared`。
-- 规则配置了 `1m` 但看起来像默认值：
-  优先检查规则是否命中实际请求的域名/路由，以及规则是否已发布生效。
